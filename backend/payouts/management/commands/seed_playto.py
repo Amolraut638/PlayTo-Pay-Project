@@ -26,23 +26,15 @@ class Command(BaseCommand):
                 account_last4=last4,
                 defaults={"label": bank_label, "ifsc": ifsc, "is_active": True},
             )
-        LedgerEntry.objects.filter(
-            merchant=merchant, reason=LedgerEntry.Reason.CUSTOMER_PAYMENT
-        ).delete()
-        for index, amount in enumerate(credits, start=1):
-            LedgerEntry.objects.create(
-                merchant=merchant,
-                direction=LedgerEntry.Direction.CREDIT,
-                reason=LedgerEntry.Reason.CUSTOMER_PAYMENT,
-                amount_paise=amount,
-                reference=f"seed-payment-{index}",
-            )
-                for index, amount in enumerate(credits, start=1):
-                    LedgerEntry.objects.create(
-                        merchant=merchant,
-                        direction=LedgerEntry.Direction.CREDIT,
-                        reason=LedgerEntry.Reason.CUSTOMER_PAYMENT,
-                        amount_paise=amount,
-                        reference=f"seed-payment-{index}",
-                    )
+            LedgerEntry.objects.filter(
+                merchant=merchant, reason=LedgerEntry.Reason.CUSTOMER_PAYMENT
+            ).delete()
+            for index, amount in enumerate(credits, start=1):
+                LedgerEntry.objects.create(
+                    merchant=merchant,
+                    direction=LedgerEntry.Direction.CREDIT,
+                    reason=LedgerEntry.Reason.CUSTOMER_PAYMENT,
+                    amount_paise=amount,
+                    reference=f"seed-payment-{index}",
+                )
             self.stdout.write(self.style.SUCCESS(f"Seeded {merchant.name} ({merchant.id})"))
