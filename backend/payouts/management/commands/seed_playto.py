@@ -37,4 +37,4 @@ class Command(BaseCommand):
                     amount_paise=amount,
                     reference=f"seed-payment-{index}",
                 )
-            self.stdout.write(self.style.SUCCESS(f"Seeded {merchant.name} ({merchant.id})"))
+            self.stdout.write(self.style.SUCCESS(f"Seeded {merchant.name} ({merchant.id})"))    
