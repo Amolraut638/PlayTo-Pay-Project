@@ -12,7 +12,7 @@ from .models import Payout
 
 @shared_task
 def process_due_payouts():
-    now = timezone.now()
+    now = timezone.now()    
     retry_stuck_processing(now)
     payout_ids = list(
         Payout.objects.filter(status=Payout.Status.PENDING, next_attempt_at__lte=now)
