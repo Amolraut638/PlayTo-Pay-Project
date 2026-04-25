@@ -77,7 +77,7 @@ def create_payout(*, merchant_id, idempotency_key, amount_paise, bank_account_id
                 reference=f"hold:{payout.id}",
             )
 
-            response = PayoutSerializer(payout).data
+            response = json.loads(json.dumps(PayoutSerializer(payout).data, default=str))
             idem.payout = payout
             idem.response_status = status.HTTP_201_CREATED
             idem.response_body = response
