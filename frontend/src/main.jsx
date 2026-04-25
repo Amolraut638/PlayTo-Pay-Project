@@ -186,7 +186,7 @@ function App() {
             <select
               className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
               value={merchantId}
-              onChange={(e) => { setMerchantId(e.target.value); setDashboard(null); }}
+              onChange={(e) => { setMerchantId(e.target.value); setDashboard(null); setBankAccountId(""); }}
             >
               {merchants.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
