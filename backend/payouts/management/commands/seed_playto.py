@@ -26,9 +26,17 @@ class Command(BaseCommand):
                 account_last4=last4,
                 defaults={"label": bank_label, "ifsc": ifsc, "is_active": True},
             )
-            if not LedgerEntry.objects.filter(
-                merchant=merchant, reason=LedgerEntry.Reason.CUSTOMER_PAYMENT
-            ).exists():
+        LedgerEntry.objects.filter(
+            merchant=merchant, reason=LedgerEntry.Reason.CUSTOMER_PAYMENT
+        ).delete()
+        for index, amount in enumerate(credits, start=1):
+            LedgerEntry.objects.create(
+                merchant=merchant,
+                direction=LedgerEntry.Direction.CREDIT,
+                reason=LedgerEntry.Reason.CUSTOMER_PAYMENT,
+                amount_paise=amount,
+                reference=f"seed-payment-{index}",
+            )
                 for index, amount in enumerate(credits, start=1):
                     LedgerEntry.objects.create(
                         merchant=merchant,
