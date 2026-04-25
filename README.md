@@ -1,51 +1,107 @@
-# Playto Pay Payout Engine
+# Playto Pay — Payout Engine
 
-Minimal payout engine for the Playto founding engineer challenge. It uses Django, DRF, PostgreSQL, Celery, Redis, React, and Tailwind.
+A minimal but production-correct payout engine for Indian merchants collecting international payments. Built for the Playto Founding Engineer challenge.
 
-The core behavior is intentionally small and strict:
+## What this does
 
-- balances are integer paise in `BigIntegerField`
-- available balance is derived from ledger credits minus debits
-- payout creation locks the merchant row before checking and holding funds
-- idempotency keys are scoped to a merchant and store the first response
-- payout state changes are guarded by a small state machine
-- stuck processing payouts are retried with exponential backoff and max 3 attempts
+- Merchants accumulate balance via credits (simulated customer payments)
+- Merchants request payouts to their Indian bank account
+- Funds are held immediately on request, released on failure
+- Background worker processes payouts asynchronously with retry logic
+- Full concurrency safety and idempotency guarantees
 
-## Run Locally
+## Tech Stack
 
-Start PostgreSQL and Redis:
+| Layer | Tech |
+|---|---|
+| Backend | Django 5 + Django REST Framework |
+| Database | PostgreSQL (amounts stored as paise in BigIntegerField) |
+| Queue | Celery + Redis |
+| Frontend | React + Tailwind CSS |
+
+## Local Setup
+
+### Prerequisites
+- Python 3.11+
+- PostgreSQL
+- Redis
+- Node.js 18+
+
+### 1. Clone the repo
 
 ```bash
-docker compose up -d
+git clone <your-repo-url>
+cd "New project"
 ```
 
-Create the backend environment:
+### 2. Backend setup
 
 ```bash
 cd backend
-python -m venv .venv
-.venv\Scripts\activate
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# Mac/Linux
+source venv/bin/activate
+
 pip install -r requirements.txt
+```
+
+### 3. Environment variables
+
+Copy the example env file:
+
+```bash
+cp ../.env.example .env
+```
+
+Edit `.env` with your database and Redis credentials:
+
+```bash
+SECRET_KEY=your-secret-key-here
+DEBUG=1
+POSTGRES_DB=playto_pay
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+CELERY_BROKER_URL=redis://localhost:6379/0
+```
+
+### 4. Database setup
+
+```bash
 python manage.py migrate
 python manage.py seed_playto
+```
+
+This seeds 3 merchants with bank accounts and credit history.
+
+### 5. Run the backend
+
+Open 3 separate terminals:
+
+**Terminal 1 — Django server:**
+
+```bash
 python manage.py runserver
 ```
 
-In two more terminals, run the worker and scheduler:
+**Terminal 2 — Celery worker:**
 
 ```bash
-cd backend
-.venv\Scripts\activate
-celery -A playto_pay worker -l info
+celery -A playto_pay worker --loglevel=info
 ```
+
+**Terminal 3 — Celery beat (scheduler):**
 
 ```bash
-cd backend
-.venv\Scripts\activate
-celery -A playto_pay beat -l info
+celery -A playto_pay beat --loglevel=info
 ```
 
-Run the frontend:
+### 6. Frontend setup
 
 ```bash
 cd frontend
@@ -53,65 +109,55 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+Visit: http://localhost:5173
 
-## API
-
-The demo uses `X-Merchant-Id` instead of auth so reviewers can switch seeded merchants quickly.
-
-List merchants:
+## Docker (easiest way)
 
 ```bash
-GET /api/v1/merchants
+docker-compose up --build
 ```
 
-Dashboard:
+This starts PostgreSQL, Redis, Django, Celery worker, Celery beat and React all together.
 
-```bash
-GET /api/v1/dashboard
-X-Merchant-Id: <merchant_uuid>
-```
+Visit: http://localhost:5173
 
-Create payout:
-
-```bash
-POST /api/v1/payouts
-X-Merchant-Id: <merchant_uuid>
-Idempotency-Key: <uuid>
-
-{
-  "amount_paise": 60000,
-  "bank_account_id": "<bank_account_uuid>"
-}
-```
-
-## Tests
-
-Run the meaningful money tests against PostgreSQL:
+## Running Tests
 
 ```bash
 cd backend
-pytest
+pytest payouts/tests/ -v
 ```
 
-Included tests:
+**Concurrency test** — verifies two simultaneous 60-rupee payout requests against a 100-rupee balance results in exactly one success and one rejection.
 
-- `payouts/tests/test_concurrency.py`: two parallel 60 rupee payouts against a 100 rupee balance result in exactly one hold.
-- `payouts/tests/test_idempotency.py`: repeat requests with the same idempotency key return the same response and create no duplicate payout.
+**Idempotency test** — verifies the same idempotency key returns the identical response without creating a duplicate payout.
 
-## Deployment Notes
+## API Reference
 
-Backend can be deployed to Render, Railway, Fly.io, or Koyeb with three processes from `backend/Procfile`: `web`, `worker`, and `beat`. Configure:
+All endpoints require `X-Merchant-Id` header.
 
-- `DATABASE_URL`
-- `CELERY_BROKER_URL`
-- `CELERY_RESULT_BACKEND`
-- `SECRET_KEY`
-- `ALLOWED_HOSTS`
-- `CORS_ALLOWED_ORIGINS`
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/v1/merchants` | List all merchants |
+| GET | `/api/v1/dashboard` | Merchant balance + payout history |
+| GET | `/api/v1/payouts` | List payouts for merchant |
+| POST | `/api/v1/payouts` | Create payout request |
 
-Frontend can be deployed to Vercel or Netlify with:
+**POST /api/v1/payouts** requires `Idempotency-Key` header (UUID).
 
-- build command: `npm run build`
-- output directory: `dist`
-- env var: `VITE_API_BASE=https://<backend-host>/api/v1`
+```json
+{
+  "amount_paise": 50000,
+  "bank_account_id": "uuid-here"
+}
+```
+
+## Architecture Decisions
+
+See [EXPLAINER.md](./EXPLAINER.md) for detailed explanation of the ledger model, locking strategy, idempotency implementation, state machine, and AI audit.
+
+## Live Demo
+
+URL: `<your-railway-url>`
+
+Test merchants are pre-seeded with balance. Use the dashboard to request payouts and watch the background worker process them in real time.

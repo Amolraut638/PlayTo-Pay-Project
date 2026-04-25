@@ -71,16 +71,30 @@ So `failed -> completed` is blocked because `FAILED` is not a key in `LEGAL_TRAN
 
 ## 5. The AI Audit
 
-One subtly wrong version AI suggested was this check-then-create payout flow:
+When I asked AI to write the retry logic for stuck payouts, it gave me this:
 
 ```python
-available = LedgerEntry.available_balance_for_merchant(merchant_id)
-if available < amount_paise:
-    raise InsufficientFunds()
-payout = Payout.objects.create(...)
-LedgerEntry.objects.create(direction="debit", amount_paise=amount_paise, payout=payout)
+if payout.status == Payout.Status.PROCESSING:
+    payout.attempts += 1
+    payout.processing_started_at = timezone.now()
+    payout.next_attempt_at = timezone.now() + timedelta(seconds=2**payout.attempts)
+    payout.save(update_fields=["attempts", "processing_started_at", "next_attempt_at", "updated_at"])
+    transaction.on_commit(lambda: settle_payout.delay(str(payout.id)))
 ```
 
-That looks reasonable, but it is race-prone. Two concurrent requests can both read the same 100 rupee balance and both insert 60 rupee debits, overdrawing the merchant.
+This looks fine at first glance. But `transition_to(PROCESSING)` already
+increments `attempts` inside its own atomic block:
 
-I replaced it with the `transaction.atomic()` plus `Merchant.objects.select_for_update()` version shown above. The important change is that the balance read and hold debit happen while holding a PostgreSQL row lock for that merchant.
+```python
+if new_status == self.Status.PROCESSING:
+    locked.attempts += 1
+```
+
+So a single retry was costing 2 attempts instead of 1. A merchant payout
+with 3 allowed attempts would actually only get 1 real retry before being
+killed and funds returned. I caught this by tracing through what happens
+when `process_payout` picks up a stuck PROCESSING payout — the attempt
+count jumped by 2 in my test, not 1.
+
+The fix was to remove the `attempts += 1` from the retry branch entirely
+and let `transition_to` own that increment as the single source of truth.

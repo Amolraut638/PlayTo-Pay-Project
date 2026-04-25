@@ -53,12 +53,12 @@ def process_payout(self, payout_id):
             return
 
         if payout.status == Payout.Status.PROCESSING:
-            payout.attempts += 1
+            # Do NOT increment attempts here — transition_to(PROCESSING) already
+            # handles that inside the state machine. Just reschedule and re-settle.
             payout.processing_started_at = timezone.now()
             payout.next_attempt_at = timezone.now() + timedelta(seconds=2**payout.attempts)
             payout.save(
                 update_fields=[
-                    "attempts",
                     "processing_started_at",
                     "next_attempt_at",
                     "updated_at",
