@@ -18,10 +18,20 @@ A minimal but production-correct payout engine for Indian merchants collecting i
 | Database | PostgreSQL (amounts stored as paise in BigIntegerField) |
 | Queue | Celery + Redis |
 | Frontend | React + Tailwind CSS |
+| Deployment | Railway |
+
+## Live Demo
+
+**Frontend:** https://welcoming-transformation-production.up.railway.app
+
+**API Base:** https://playto-pay-project-production.up.railway.app/api/v1
+
+Test merchants are pre-seeded with balance. Use the dashboard to request payouts and watch the background worker process them in real time.
 
 ## Local Setup
 
 ### Prerequisites
+
 - Python 3.11+
 - PostgreSQL
 - Redis
@@ -30,34 +40,35 @@ A minimal but production-correct payout engine for Indian merchants collecting i
 ### 1. Clone the repo
 
 ```bash
-git clone <your-repo-url>
-cd "New project"
+git clone https://github.com/Amolraut638/PlayTo-Pay-Project.git
+cd PlayTo-Pay-Project
 ```
 
 ### 2. Backend setup
 
 ```bash
 cd backend
+
+# Create virtual environment
 python -m venv venv
 
-# Windows
+# Activate on Windows
 venv\Scripts\activate
 
-# Mac/Linux
+# Activate on Mac/Linux
 source venv/bin/activate
 
+# Install dependencies
 pip install -r requirements.txt
 ```
 
 ### 3. Environment variables
 
-Copy the example env file:
-
 ```bash
-cp ../.env.example .env
+cp .env.example .env
 ```
 
-Edit `.env` with your database and Redis credentials:
+Edit `.env` with your credentials:
 
 ```bash
 SECRET_KEY=your-secret-key-here
@@ -68,6 +79,9 @@ POSTGRES_PASSWORD=postgres
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+VITE_API_BASE=http://localhost:8000/api/v1
 ```
 
 ### 4. Database setup
@@ -77,7 +91,10 @@ python manage.py migrate
 python manage.py seed_playto
 ```
 
-This seeds 3 merchants with bank accounts and credit history.
+This seeds 3 merchants with bank accounts and credit history:
+- Aarav Design Studio — ₹31,000 balance
+- Nisha Growth Labs — ₹19,000 balance
+- Studio Kaveri — ₹17,250 balance
 
 ### 5. Run the backend
 
@@ -154,10 +171,9 @@ All endpoints require `X-Merchant-Id` header.
 
 ## Architecture Decisions
 
-See [EXPLAINER.md](./EXPLAINER.md) for detailed explanation of the ledger model, locking strategy, idempotency implementation, state machine, and AI audit.
-
-## Live Demo
-
-URL: `<your-railway-url>`
-
-Test merchants are pre-seeded with balance. Use the dashboard to request payouts and watch the background worker process them in real time.
+See [EXPLAINER.md](./EXPLAINER.md) for detailed explanation of:
+- Ledger model and balance calculation query
+- Locking strategy using PostgreSQL SELECT FOR UPDATE
+- Idempotency implementation and race condition handling
+- State machine and illegal transition blocking
+- AI audit — real bug caught and fixed
